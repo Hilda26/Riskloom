@@ -1,0 +1,28 @@
+:root {
+  --bg:       #080B14;
+  --bg2:      #0C0F1A;
+  --surface:  #0F1221;
+  --surface2: #161928;
+  --surface3: #1D2035;
+  --amber:    #F59E0B;
+  --amber2:   #FBBF24;
+  --amber3:   #FDE68A;
+  --indigo:   #6366F1;
+  --indigo2:  #818CF8;
+  --indigo3:  #A5B4FC;
+  --safe:     #10B981;
+  --safe2:    #34D399;
+  --warn:     #F97316;
+  --danger:   #EF4444;
+  --text:     #F8FAFC;
+  --text2:    #94A3B8;
+  --text3:    #475569;
+  --ag: rgba(245,158,11,0.15);
+  --ig: rgba(99,102,241,0.15);
+  --ab: rgba(245,158,11,0.25);
+  --ib: rgba(99,102,241,0.22);
+
+  --sg: 'Space Grotesk', system-ui, sans-serif;
+  --body: 'Inter', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+}

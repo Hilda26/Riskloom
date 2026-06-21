@@ -1,0 +1,231 @@
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
+#
+# StableScoreOracle - StableShield AI's on-chain risk oracle.
+#
+# One Intelligent Contract, deployed once to GenLayer Studio /
+# StudioNet, fees paid in GEN. Registers stablecoins, accepts the
+# five off-chain risk-module subscores from the Supabase scoring
+# pipeline, and uses GenLayer's LLM-backed equivalence principle so
+# validators reach consensus on the resulting StableScore rating and
+# its plain-English justification - not just a deterministic setter.
+#
+# Deliberately mirrors the patterns confirmed in GenLayer's own
+# verified examples (docs.genlayer.com/developers/intelligent-contracts/
+# first-intelligent-contract, .../examples/prediction, and the
+# genlayerlabs/genlayer-project-boilerplate football_bets.py contract):
+# no module-level globals, no negative-index slicing/reversed(), no
+# raised exceptions from public methods - see deploy_notes.md.
+
+from genlayer import *
+from dataclasses import dataclass
+import json
+
+
+@allow_storage
+@dataclass
+class StablecoinRecord:
+    name: str
+    rating: str
+    score: u256
+    peg: u256
+    reserve_ratio: u256
+    updated_at: str
+    registered: bool
+
+
+@allow_storage
+@dataclass
+class ScoreHistoryEntry:
+    symbol: str
+    rating: str
+    score: u256
+    reason: str
+    recorded_at: str
+
+
+class Contract(gl.Contract):
+    registry: TreeMap[str, StablecoinRecord]
+    history: DynArray[ScoreHistoryEntry]
+    owner: Address
+
+    def __init__(self):
+        self.owner = gl.message.sender_address
+
+    # -------------------------------------------------------- writes --
+
+    @gl.public.write
+    def register_stablecoin(self, symbol: str, name: str) -> str:
+        symbol = symbol.upper()
+        if symbol in self.registry:
+            return f"{symbol} already registered"
+
+        self.registry[symbol] = StablecoinRecord(
+            name=name,
+            rating="D",
+            score=0,
+            peg=0,
+            reserve_ratio=0,
+            updated_at="never",
+            registered=True,
+        )
+        return f"{symbol} registered"
+
+    @gl.public.write
+    def update_score(
+        self,
+        symbol: str,
+        reserve_subscore: int,
+        issuer_subscore: int,
+        peg_subscore: int,
+        regulatory_subscore: int,
+        sentiment_subscore: int,
+        peg_price_bps: int,
+        reserve_ratio_bps: int,
+        evidence_summary: str,
+        updated_at: str,
+    ) -> str:
+        """
+        Called by the publish-to-genlayer Supabase Edge Function once a
+        composite score has been computed off-chain. The five subscores
+        and the evidence summary are handed to the LLM so the contract
+        itself reasons about the final letter grade and records *why* -
+        this is the non-deterministic, LLM-backed step that GenLayer's
+        validator network reaches consensus on, rather than a plain
+        arithmetic setter.
+        """
+        grades = ["AAA", "AA", "A", "BBB", "BB", "B", "CCC", "D"]
+        symbol = symbol.upper()
+        if symbol not in self.registry:
+            return f"{symbol} is not registered"
+
+        subscores = {
+            "reserve": reserve_subscore,
+            "issuer": issuer_subscore,
+            "peg": peg_subscore,
+            "regulatory": regulatory_subscore,
+            "sentiment": sentiment_subscore,
+        }
+
+        def assess() -> str:
+            prompt = (
+                "You are a stablecoin risk-rating engine. Given the five "
+                "risk module subscores below (0-100, higher is safer) and "
+                "an evidence summary, assign exactly one letter grade from "
+                f"this list ordered safest to riskiest: {grades}. "
+                "Weight reserve health and peg stability most heavily. "
+                "Respond as compact JSON with keys 'rating' and 'reason' "
+                "only.\n\n"
+                f"Subscores: {json.dumps(subscores)}\n"
+                f"Evidence: {evidence_summary}\n"
+            )
+            result = gl.nondet.exec_prompt(prompt, response_format="json")
+            rating = str(result["rating"]).upper()
+            if rating not in grades:
+                rating = "D"
+            reason = str(result["reason"])[:280]
+            return json.dumps({"rating": rating, "reason": reason})
+
+        raw = gl.eq_principle.prompt_non_comparative(
+            assess,
+            task=(
+                "Assign a StableScore letter grade (AAA..D) to a "
+                "stablecoin from its five risk subscores and evidence."
+            ),
+            criteria=(
+                "The chosen grade must be one of AAA, AA, A, BBB, BB, B, "
+                "CCC, D and must be consistent with the relative weight "
+                "of the subscores (lower subscores, especially reserve "
+                "and peg, must not yield a safer grade than higher ones)."
+            ),
+        )
+        decision = json.loads(raw)
+        rating = decision["rating"]
+        reason = decision["reason"]
+
+        composite = (
+            reserve_subscore * 30
+            + issuer_subscore * 20
+            + peg_subscore * 25
+            + regulatory_subscore * 15
+            + sentiment_subscore * 10
+        ) // 100
+
+        record = self.registry[symbol]
+        record.rating = rating
+        record.score = composite
+        record.peg = peg_price_bps
+        record.reserve_ratio = reserve_ratio_bps
+        record.updated_at = updated_at
+        self.registry[symbol] = record
+
+        self.history.append(
+            ScoreHistoryEntry(
+                symbol=symbol,
+                rating=rating,
+                score=composite,
+                reason=reason,
+                recorded_at=updated_at,
+            )
+        )
+        return rating
+
+    # --------------------------------------------------------- views --
+
+    @gl.public.view
+    def get_score(self, symbol: str) -> dict:
+        symbol = symbol.upper()
+        if symbol not in self.registry:
+            return {"error": f"{symbol} is not registered"}
+        record = self.registry[symbol]
+        return {
+            "symbol": symbol,
+            "name": record.name,
+            "rating": record.rating,
+            "score": int(record.score),
+            "peg": int(record.peg),
+            "reserve_ratio": int(record.reserve_ratio),
+            "updated_at": record.updated_at,
+        }
+
+    @gl.public.view
+    def get_history(self, symbol: str, limit: int) -> list:
+        symbol = symbol.upper()
+        matches = []
+        for entry in self.history:
+            if entry.symbol == symbol:
+                matches.append(entry)
+
+        total = len(matches)
+        count = total
+        if limit > 0 and limit < total:
+            count = limit
+        start = total - count
+
+        result = []
+        i = total - 1
+        while i >= start:
+            entry = matches[i]
+            result.append({
+                "rating": entry.rating,
+                "score": int(entry.score),
+                "reason": entry.reason,
+                "recorded_at": entry.recorded_at,
+            })
+            i = i - 1
+        return result
+
+    @gl.public.view
+    def is_safe(self, symbol: str, min_rating: str) -> bool:
+        grades = ["AAA", "AA", "A", "BBB", "BB", "B", "CCC", "D"]
+        symbol = symbol.upper()
+        min_rating = min_rating.upper()
+        if symbol not in self.registry:
+            return False
+        if min_rating not in grades:
+            return False
+        record = self.registry[symbol]
+        return grades.index(record.rating) <= grades.index(min_rating)
+
+    @gl.public.view
+    def list_stablecoins(self) -> list:
+        return list(self.registry.keys())

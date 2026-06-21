@@ -1,0 +1,57 @@
+# Supabase project configuration
+
+project_id = "stableshield-ai"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["https://app.stableshield.ai"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+
+[edge_runtime]
+enabled = true
+policy = "oneshot"
+
+[functions]
+[functions.siwe-nonce]
+verify_jwt = false
+[functions.siwe-verify]
+verify_jwt = false
+[functions.compute-stablescore]
+verify_jwt = true
+[functions.publish-to-genlayer]
+verify_jwt = true
+[functions.api-v1-scores]
+verify_jwt = false
+[functions.api-v1-history]
+verify_jwt = false
+[functions.health]
+verify_jwt = false
+[functions.ingest-reserves]
+verify_jwt = true
+[functions.ingest-peg]
+verify_jwt = true
+[functions.ingest-sentiment]
+verify_jwt = true
+[functions.ingest-regulatory]
+verify_jwt = true

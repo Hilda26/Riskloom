@@ -1,0 +1,43 @@
+{
+  "name": "@stableshield/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "next": "^15.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "wagmi": "^2.12.0",
+    "viem": "^2.21.0",
+    "@tanstack/react-query": "^5.59.0",
+    "@rainbow-me/rainbowkit": "^2.1.6",
+    "siwe": "^2.3.2",
+    "@supabase/supabase-js": "^2.45.4",
+    "@supabase/ssr": "^0.5.1",
+    "genlayer-js": "^1.1.8",
+    "@stableshield/shared-types": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.2",
+    "@types/node": "^22.7.0",
+    "@types/react": "^18.3.10",
+    "@types/react-dom": "^18.3.0",
+    "eslint": "^9.11.1",
+    "eslint-config-next": "^15.0.0",
+    "@eslint/eslintrc": "^3.1.0",
+    "vitest": "^2.1.1",
+    "@testing-library/react": "^16.0.1",
+    "@testing-library/jest-dom": "^6.5.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "jsdom": "^25.0.1",
+    "@playwright/test": "^1.47.2"
+  }
+}

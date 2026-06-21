@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  frontend:
+    name: Frontend lint, typecheck, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm --filter @stableshield/web typecheck
+
+      - name: Lint
+        run: pnpm --filter @stableshield/web lint
+
+      - name: Unit tests
+        run: pnpm --filter @stableshield/web test
+
+      - name: Build
+        run: pnpm --filter @stableshield/web build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
+          NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: placeholder
+
+  backend:
+    name: Backend Edge Function unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: v2.x
+
+      - name: Run Deno tests
+        run: deno test backend/supabase/functions/_shared/scoring.test.ts
+
+  contract:
+    name: Intelligent contract syntax check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate contract.gpy parses as valid Python
+        run: |
+          python -c "
+          import ast
+          with open('intelligent-contracts/stablescore_oracle/contract.gpy', encoding='utf-8') as f:
+              ast.parse(f.read())
+          print('contract.gpy syntax OK')
+          "

@@ -1,0 +1,49 @@
+{
+  "contract": "StableScoreOracle",
+  "network": "genlayer-studionet",
+  "fee_token": "GEN",
+  "methods": {
+    "register_stablecoin": {
+      "type": "write",
+      "args": { "symbol": "str", "name": "str" },
+      "returns": "str"
+    },
+    "update_score": {
+      "type": "write",
+      "args": {
+        "symbol": "str",
+        "reserve_subscore": "int",
+        "issuer_subscore": "int",
+        "peg_subscore": "int",
+        "regulatory_subscore": "int",
+        "sentiment_subscore": "int",
+        "peg_price_bps": "int",
+        "reserve_ratio_bps": "int",
+        "evidence_summary": "str",
+        "updated_at": "str"
+      },
+      "returns": "str (final rating, or an error message string like '<symbol> is not registered' - never raises)",
+      "notes": "Non-deterministic: validators reach consensus via gl.eq_principle.prompt_non_comparative on the LLM-assigned rating + reason."
+    },
+    "get_score": {
+      "type": "view",
+      "args": { "symbol": "str" },
+      "returns": "dict { symbol, name, rating, score, peg, reserve_ratio, updated_at } - or { error: str } if the symbol is not registered"
+    },
+    "get_history": {
+      "type": "view",
+      "args": { "symbol": "str", "limit": "int" },
+      "returns": "list[dict { rating, score, reason, recorded_at }]"
+    },
+    "is_safe": {
+      "type": "view",
+      "args": { "symbol": "str", "min_rating": "str" },
+      "returns": "bool"
+    },
+    "list_stablecoins": {
+      "type": "view",
+      "args": {},
+      "returns": "list[str]"
+    }
+  }
+}
