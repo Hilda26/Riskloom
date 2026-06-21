@@ -2,6 +2,7 @@
   "name": "stableshield-ai",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.28.0",
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
     "dev": "turbo run dev",
