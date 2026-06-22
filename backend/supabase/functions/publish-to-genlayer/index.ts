@@ -113,8 +113,25 @@ Deno.serve(async (req) => {
         ],
         value: 0n,
       });
-      await genlayer.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
-      status = "confirmed";
+      try {
+        await genlayer.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
+        status = "confirmed";
+      } catch (waitErr) {
+        // waitForTransactionReceipt polls for a specific status and can
+        // throw a timeout even when the transaction already finalized
+        // successfully past that status (confirmed against a real
+        // StudioNet tx during testing) - fall back to checking the
+        // transaction's actual recorded outcome directly instead of
+        // assuming failure.
+        console.error("waitForTransactionReceipt threw, checking tx directly", waitErr);
+        const tx: any = await genlayer.getTransaction({ hash: txHash as `0x${string}` });
+        const resultName = tx.result_name ?? tx.resultName;
+        const leaderSucceeded =
+          (tx.consensus_data?.leader_receipt ?? tx.consensusData?.leaderReceipt)?.[0]
+            ?.execution_result === "SUCCESS";
+        const consensusReached = resultName === "MAJORITY_AGREE" || resultName === "AGREE";
+        status = leaderSucceeded && consensusReached ? "confirmed" : "failed";
+      }
     } catch (writeErr) {
       console.error("genlayer writeContract failed", writeErr);
     }
