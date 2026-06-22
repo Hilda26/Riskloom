@@ -131,11 +131,57 @@ documented integration path is the `genlayer-js` npm SDK
 `client.writeContract`, `client.waitForTransactionReceipt`), confirmed
 by installing it locally and reading its real TypeScript type
 declarations rather than guessing from prose docs. Both files were
-rewritten to use the SDK. A fresh, unfunded service account
-(`GENLAYER_PRIVATE_KEY` Edge Function secret) was generated for
-`publish-to-genlayer` to sign `update_score` calls with - it has not
-yet sent any transaction and may need StudioNet GEN before its first
-write succeeds.
+rewritten to use the SDK. A fresh service account
+(`GENLAYER_PRIVATE_KEY` Edge Function secret,
+`0x34998AAE8D4c59A8816B11D28E9a20ca8B979577`) was generated for
+`publish-to-genlayer` to sign `update_score` calls with -
+**StudioNet did not require any GEN funding**, write transactions
+succeeded from a 0-balance account.
+
+All 10 seed stablecoins (USDC, USDT, DAI, FRAX, TUSD, BUSD, USDP,
+GUSD, LUSD, MIM) were registered on-chain via `register_stablecoin`.
+
+## Second bug, found from a real transaction trace
+
+The first live `update_score` call (via `publish-to-genlayer`, for
+USDC) returned `{"status":"confirmed", "rating":"AAA"}` from our Edge
+Function, but reading the contract back afterward showed the score
+had **not** actually been written (`rating: "D"`, `updated_at:
+"never"`). Pulling the full transaction receipt
+(`client.waitForTransactionReceipt`) showed `status_name: "FINALIZED"`
+but every validator's `genvm_result` had `execution_result: "ERROR"`:
+
+```
+File "/contract.py", line 127, in update_score
+    decision = json.loads(raw)
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+```
+
+The receipt's `eq_outputs` field showed GenVM's non-comparative
+equivalence judging had already correctly determined the answer was
+`"AAA"` - as a bare value, not our `json.dumps({"rating":...,
+"reason":...})` wrapper. `gl.eq_principle.prompt_non_comparative`
+does not transparently pass through whatever `assess()` returns; it
+re-derives a judged result against `task`/`criteria`, and that result
+came back as a plain string, not our JSON envelope. `raw` ended up
+empty, and `json.loads("")` is exactly the observed error.
+
+**Fix:** stopped wrapping the LLM's answer in JSON entirely.
+`assess()` now returns the bare rating string (using
+`gl.nondet.exec_prompt(prompt)` - the plain-text overload, not
+`response_format="json"`), and `reason` is now just the deterministic
+`evidence_summary` string instead of separately asking the LLM for
+free-text rationale. The grade itself is still entirely LLM-derived
+and validator-judged via `gl.eq_principle.prompt_non_comparative` -
+only the brittle JSON round-trip was removed.
+
+**This requires a redeploy.** GenLayer contracts are immutable once
+deployed, so the corrected `contract.gpy` needs a fresh deployment to
+a new address, the 10 stablecoins re-registered against it, and the
+new address re-wired into `GENLAYER_CONTRACT_ADDRESS` /
+`NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS` everywhere.
+
+Contract address (pre-fix, do not reuse): `0xd2d06D078Ab781fEE5DAfE553fb0E4aA2EfcAfAb`
 
 Still outstanding: call `register_stablecoin` for the 10 seed symbols
 against the live contract (requires an explicit go-ahead - sending

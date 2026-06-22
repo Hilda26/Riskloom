@@ -134,19 +134,17 @@ class Contract(gl.Contract):
                 "an evidence summary, assign exactly one letter grade from "
                 f"this list ordered safest to riskiest: {grades}. "
                 "Weight reserve health and peg stability most heavily. "
-                "Respond as compact JSON with keys 'rating' and 'reason' "
-                "only.\\n\\n"
+                "Respond with ONLY the letter grade, nothing else.\\n\\n"
                 f"Subscores: {json.dumps(subscores)}\\n"
                 f"Evidence: {evidence_summary}\\n"
             )
-            result = gl.nondet.exec_prompt(prompt, response_format="json")
-            rating = str(result["rating"]).upper()
+            result = gl.nondet.exec_prompt(prompt)
+            rating = str(result).strip().upper()
             if rating not in grades:
                 rating = "D"
-            reason = str(result["reason"])[:280]
-            return json.dumps({"rating": rating, "reason": reason})
+            return rating
 
-        raw = gl.eq_principle.prompt_non_comparative(
+        rating = gl.eq_principle.prompt_non_comparative(
             assess,
             task=(
                 "Assign a StableScore letter grade (AAA..D) to a "
@@ -159,9 +157,9 @@ class Contract(gl.Contract):
                 "and peg, must not yield a safer grade than higher ones)."
             ),
         )
-        decision = json.loads(raw)
-        rating = decision["rating"]
-        reason = decision["reason"]
+        if rating not in grades:
+            rating = "D"
+        reason = evidence_summary[:280]
 
         composite = (
             reserve_subscore * 30
