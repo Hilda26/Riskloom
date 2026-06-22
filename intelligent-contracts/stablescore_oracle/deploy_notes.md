@@ -181,8 +181,60 @@ a new address, the 10 stablecoins re-registered against it, and the
 new address re-wired into `GENLAYER_CONTRACT_ADDRESS` /
 `NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS` everywhere.
 
-Contract address (pre-fix, do not reuse): `0xd2d06D078Ab781fEE5DAfE553fb0E4aA2EfcAfAb`
+Contract address (bug #1, do not reuse): `0xd2d06D078Ab781fEE5DAfE553fb0E4aA2EfcAfAb`
 
-Still outstanding: call `register_stablecoin` for the 10 seed symbols
-against the live contract (requires an explicit go-ahead - sending
-on-chain write transactions is not something to do unprompted).
+## Third bug, also found from a real transaction trace
+
+After redeploying the bug #1 fix to a new address
+(`0x6022967eD041daEc68Fe96121900F627DaDa7618`) and re-registering all
+10 stablecoins, the leader's `execution_result` finally showed
+`SUCCESS` - but the overall transaction `result_name` was
+`NO_MAJORITY`. The full receipt showed `last_round.validator_votes_name:
+["DISAGREE","DISAGREE","IDLE","DISAGREE","AGREE"]` after exhausting
+all 3 leader rotations.
+
+Root cause: each of GenLayer's 5 StudioNet validators runs a
+*different* underlying LLM (seen in the receipt's
+`node_config.primary_model`: DeepSeek, Gemini, Grok, GPT, GLM).
+`gl.eq_principle.prompt_non_comparative` was being used to ask each
+validator's model to independently pick 1-of-8 categorical letter
+grades from the same five raw numbers - and different LLMs simply
+don't reliably converge on a discrete classification like that,
+especially near grade boundaries. This is a real protocol-level
+consensus failure, not a code bug in the narrow sense - the wrong
+*task* was being delegated to multi-model LLM consensus.
+
+**Fix:** the letter grade is now computed **deterministically** in
+`update_score`, using the exact same weighted formula and grade
+boundaries as the off-chain `compute-stablescore` Edge Function
+(`backend/supabase/functions/_shared/scoring.ts`) - guaranteeing
+on-chain and off-chain never disagree, and guaranteeing every
+validator computes the identical result (zero chance of
+`NO_MAJORITY` on the grade itself, since classifying a number into a
+band is arithmetic, not a judgment call). The LLM/`prompt_non_comparative`
+call is still genuinely used, just for something that naturally
+converges across different models: a narrow yes/no question ("does
+the evidence text mention an explicit red flag the numeric score
+wouldn't capture") that can downgrade the deterministic grade by one
+notch. This keeps the contract's LLM-backed consensus step meaningful
+(it can actually change the outcome) while removing the failure mode
+that caused `NO_MAJORITY`.
+
+**This requires another redeploy** for the same reason as bug #1 -
+contracts are immutable.
+
+Contract address (bug #2, do not reuse): `0x6022967eD041daEc68Fe96121900F627DaDa7618`
+
+## Status
+
+All 10 seed stablecoins were registered against both prior (buggy)
+addresses as part of debugging - neither should be used going
+forward. Once the bug #3 fix is deployed to a new address: re-register
+the 10 symbols, re-wire `GENLAYER_CONTRACT_ADDRESS` /
+`NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS` (Supabase secret + Vercel env
+var, already updated twice this session via CLI/API, not the
+dashboard), and re-verify with a real `publish-to-genlayer` call
+followed by reading `get_score`/`get_history` back to confirm the
+write actually landed - confirming `status: "confirmed"` from the
+Edge Function alone was not sufficient evidence in either prior
+attempt.

@@ -26,9 +26,12 @@ CONTRACT_GPY = '''\
 # One Intelligent Contract, deployed once to GenLayer Studio /
 # StudioNet, fees paid in GEN. Registers stablecoins, accepts the
 # five off-chain risk-module subscores from the Supabase scoring
-# pipeline, and uses GenLayer's LLM-backed equivalence principle so
-# validators reach consensus on the resulting StableScore rating and
-# its plain-English justification - not just a deterministic setter.
+# pipeline, derives the letter grade deterministically (same weighted
+# formula as compute-stablescore, so on-chain and off-chain never
+# disagree), then uses GenLayer's LLM-backed non-comparative
+# equivalence principle to ask every validator's model a narrow
+# yes/no question - does the evidence text mention a red flag the
+# numbers alone wouldn't catch - and downgrades the grade if so.
 #
 # Deliberately mirrors the patterns confirmed in GenLayer's own
 # verified examples (docs.genlayer.com/developers/intelligent-contracts/
@@ -39,7 +42,6 @@ CONTRACT_GPY = '''\
 
 from genlayer import *
 from dataclasses import dataclass
-import json
 
 
 @allow_storage
@@ -107,60 +109,27 @@ class Contract(gl.Contract):
     ) -> str:
         """
         Called by the publish-to-genlayer Supabase Edge Function once a
-        composite score has been computed off-chain. The five subscores
-        and the evidence summary are handed to the LLM so the contract
-        itself reasons about the final letter grade and records *why* -
-        this is the non-deterministic, LLM-backed step that GenLayer's
-        validator network reaches consensus on, rather than a plain
-        arithmetic setter.
+        composite score has been computed off-chain. The letter grade
+        is derived deterministically from the five subscores; the LLM
+        is only asked a narrow yes/no question about the evidence text
+        and can downgrade the grade by one notch if it spots a red
+        flag the numbers alone wouldn't catch.
         """
         grades = ["AAA", "AA", "A", "BBB", "BB", "B", "CCC", "D"]
+        grade_boundaries = [97, 90, 80, 65, 50, 35, 15, 0]
         symbol = symbol.upper()
         if symbol not in self.registry:
             return f"{symbol} is not registered"
 
-        subscores = {
-            "reserve": reserve_subscore,
-            "issuer": issuer_subscore,
-            "peg": peg_subscore,
-            "regulatory": regulatory_subscore,
-            "sentiment": sentiment_subscore,
-        }
-
-        def assess() -> str:
-            prompt = (
-                "You are a stablecoin risk-rating engine. Given the five "
-                "risk module subscores below (0-100, higher is safer) and "
-                "an evidence summary, assign exactly one letter grade from "
-                f"this list ordered safest to riskiest: {grades}. "
-                "Weight reserve health and peg stability most heavily. "
-                "Respond with ONLY the letter grade, nothing else.\\n\\n"
-                f"Subscores: {json.dumps(subscores)}\\n"
-                f"Evidence: {evidence_summary}\\n"
-            )
-            result = gl.nondet.exec_prompt(prompt)
-            rating = str(result).strip().upper()
-            if rating not in grades:
-                rating = "D"
-            return rating
-
-        rating = gl.eq_principle.prompt_non_comparative(
-            assess,
-            task=(
-                "Assign a StableScore letter grade (AAA..D) to a "
-                "stablecoin from its five risk subscores and evidence."
-            ),
-            criteria=(
-                "The chosen grade must be one of AAA, AA, A, BBB, BB, B, "
-                "CCC, D and must be consistent with the relative weight "
-                "of the subscores (lower subscores, especially reserve "
-                "and peg, must not yield a safer grade than higher ones)."
-            ),
-        )
-        if rating not in grades:
-            rating = "D"
-        reason = evidence_summary[:280]
-
+        # The letter grade is derived deterministically from the
+        # weighted composite (matching compute-stablescore's off-chain
+        # formula exactly) so every validator computes the identical
+        # grade with zero chance of disagreement - classifying one of
+        # eight categories is arithmetic, not a judgment call, and an
+        # earlier version that asked each validator's (different) LLM
+        # to pick a grade directly hit real NO_MAJORITY consensus
+        # failures on StudioNet because five different models don't
+        # reliably agree on a discrete 1-of-8 label from raw numbers.
         composite = (
             reserve_subscore * 30
             + issuer_subscore * 20
@@ -168,6 +137,51 @@ class Contract(gl.Contract):
             + regulatory_subscore * 15
             + sentiment_subscore * 10
         ) // 100
+
+        rating = "D"
+        for boundary, grade in zip(grade_boundaries, grades):
+            if composite >= boundary:
+                rating = grade
+                break
+
+        # The genuinely non-deterministic, LLM-backed step: a narrow
+        # yes/no question that naturally converges across different
+        # validator models, used to catch qualitative red flags the
+        # numeric subscores might miss and downgrade the deterministic
+        # grade by one notch if so.
+        def assess() -> str:
+            prompt = (
+                f"A stablecoin has a composite risk score of {composite} "
+                "out of 100 (higher is safer) and the following evidence: "
+                f"{evidence_summary}\\n\\n"
+                "Does the evidence mention any red flag - fraud, "
+                "insolvency, a depeg event, or regulatory enforcement - "
+                "that a numeric score alone would not capture? "
+                "Respond with ONLY YES or NO."
+            )
+            result = gl.nondet.exec_prompt(prompt)
+            answer = str(result).strip().upper()
+            if answer not in ("YES", "NO"):
+                answer = "NO"
+            return answer
+
+        flag = gl.eq_principle.prompt_non_comparative(
+            assess,
+            task=(
+                "Determine whether the evidence text contains an "
+                "explicit red flag not reflected by the numeric score."
+            ),
+            criteria=(
+                "Answer must be exactly YES or NO, and YES only if the "
+                "evidence text explicitly mentions fraud, insolvency, "
+                "a depeg event, or regulatory enforcement action."
+            ),
+        )
+        if flag == "YES":
+            idx = grades.index(rating)
+            rating = grades[min(idx + 1, len(grades) - 1)]
+
+        reason = evidence_summary[:280]
 
         record = self.registry[symbol]
         record.rating = rating
