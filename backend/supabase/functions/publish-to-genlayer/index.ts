@@ -118,19 +118,32 @@ Deno.serve(async (req) => {
         status = "confirmed";
       } catch (waitErr) {
         // waitForTransactionReceipt polls for a specific status and can
-        // throw a timeout even when the transaction already finalized
-        // successfully past that status (confirmed against a real
-        // StudioNet tx during testing) - fall back to checking the
-        // transaction's actual recorded outcome directly instead of
-        // assuming failure.
-        console.error("waitForTransactionReceipt threw, checking tx directly", waitErr);
-        const tx: any = await genlayer.getTransaction({ hash: txHash as `0x${string}` });
-        const resultName = tx.result_name ?? tx.resultName;
-        const leaderSucceeded =
-          (tx.consensus_data?.leader_receipt ?? tx.consensusData?.leaderReceipt)?.[0]
-            ?.execution_result === "SUCCESS";
-        const consensusReached = resultName === "MAJORITY_AGREE" || resultName === "AGREE";
-        status = leaderSucceeded && consensusReached ? "confirmed" : "failed";
+        // throw a timeout even when the transaction has already (or is
+        // about to be) finalized successfully past that status -
+        // confirmed against several real StudioNet transactions during
+        // testing. Poll the transaction's own recorded outcome directly
+        // instead of giving up after a single immediate check, which
+        // can itself race ahead of consensus finishing.
+        console.error("waitForTransactionReceipt threw, polling tx directly", waitErr);
+        status = "failed";
+        for (let attempt = 0; attempt < 5; attempt++) {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          const tx: any = await genlayer.getTransaction({ hash: txHash as `0x${string}` });
+          const leaderReceipt =
+            (tx.consensus_data?.leader_receipt ?? tx.consensusData?.leaderReceipt)?.[0];
+          // GenLayer's "Optimistic Democracy" consensus applies the
+          // leader's result optimistically - a result_name of
+          // NO_MAJORITY does NOT mean the write failed (confirmed: a
+          // real StudioNet tx with NO_MAJORITY still correctly wrote
+          // its score on-chain). The only thing that actually
+          // indicates the contract call itself succeeded is the
+          // leader's own execution_result.
+          if (leaderReceipt?.execution_result === "SUCCESS") {
+            status = "confirmed";
+            break;
+          }
+          if (leaderReceipt?.execution_result === "ERROR") break; // definitive failure, stop polling
+        }
       }
     } catch (writeErr) {
       console.error("genlayer writeContract failed", writeErr);
