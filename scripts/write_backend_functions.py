@@ -164,11 +164,23 @@ Deno.serve(async (req) => {
       });
     if (linkErr) throw linkErr;
 
+    // Return the bare hashed_token instead of properties.action_link.
+    // action_link points at GoTrue's own hosted /auth/v1/verify
+    // endpoint on the *Supabase* domain, which then 302-redirects to
+    // the project's Site URL with the session in a URL hash fragment -
+    // that depends on Site URL being correctly configured AND on some
+    // page reading window.location.hash, neither of which our
+    // /auth/callback route (which expects ?token_hash=&type= query
+    // params per Supabase's documented SSR/PKCE pattern) does. Using
+    // hashed_token directly with our own same-origin /auth/callback
+    // keeps the whole redirect on whatever domain the user is
+    // actually on, independent of the Site URL setting.
     return new Response(
       JSON.stringify({
         address,
         userId,
-        actionLink: link.properties.action_link,
+        tokenHash: link.properties.hashed_token,
+        type: "magiclink",
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

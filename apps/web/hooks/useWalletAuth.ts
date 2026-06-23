@@ -24,8 +24,8 @@ export function useWalletAuth() {
         const siweMessage = buildSiweMessage({ address, chainId, nonce });
         const preparedMessage = siweMessage.prepareMessage();
         const signature = await signMessageAsync({ message: preparedMessage });
-        const { actionLink } = await verifySiwe(preparedMessage, signature);
-        window.location.href = actionLink;
+        const { tokenHash, type } = await verifySiwe(preparedMessage, signature);
+        window.location.href = `/auth/callback?token_hash=${tokenHash}&type=${type}`;
       } catch (err) {
         console.error("SIWE sign-in failed", err);
         attempted.current = null;

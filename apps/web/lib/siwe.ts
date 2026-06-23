@@ -42,5 +42,10 @@ export async function verifySiwe(message: string, signature: string) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error ?? "SIWE verification failed");
   }
-  return res.json() as Promise<{ address: string; userId: string; actionLink: string }>;
+  return res.json() as Promise<{
+    address: string;
+    userId: string;
+    tokenHash: string;
+    type: string;
+  }>;
 }
