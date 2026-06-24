@@ -1,7 +1,8 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { KpiRow } from "@/components/dashboard/KpiRow";
 import { StablecoinTable } from "@/components/dashboard/StablecoinTable";
-import { ActionButton } from "@/components/ui/Button";
+import { ExportReportButton } from "@/components/dashboard/ExportReportButton";
 import type { StablecoinWithScore } from "@/types/risk";
 
 export const revalidate = 0;
@@ -22,8 +23,10 @@ export default async function DashboardPage() {
           <div className="dm-sub">LIVE - {items.length} assets - StudioNet Oracle</div>
         </div>
         <div className="dm-acts">
-          <ActionButton>Export Report</ActionButton>
-          <ActionButton variant="primary">&#9889; Live Alerts</ActionButton>
+          <ExportReportButton items={items} />
+          <Link href="/alerts" className="dm-b dm-bp" style={{ textDecoration: "none" }}>
+            &#9889; Live Alerts
+          </Link>
         </div>
       </div>
       <KpiRow items={items} />

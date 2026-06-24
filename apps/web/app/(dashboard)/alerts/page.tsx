@@ -27,12 +27,13 @@ export default async function AlertsPage() {
         <div
           className="tbl-row"
           key={alert.id}
-          style={{ gridTemplateColumns: "1fr 3fr 1fr", cursor: "default" }}
+          style={{ gridTemplateColumns: ".8fr .6fr 2.5fr 1fr", cursor: "default" }}
         >
           <div className={alert.severity === "critical" ? "hi-r risk-ind" : alert.severity === "warning" ? "mid-r risk-ind" : "low-r risk-ind"}>
             <span className="ri-dot" />
             <span className="ri-lbl">{alert.severity}</span>
           </div>
+          <div className="tc-sym">{alert.stablecoins?.symbol ?? ""}</div>
           <div className="tc-name">{alert.message}</div>
           <div className="tc-sym">{new Date(alert.triggered_at).toLocaleString()}</div>
         </div>
