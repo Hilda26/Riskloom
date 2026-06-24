@@ -1,4 +1,4 @@
-# StableShield AI
+# Riskloom
 
 AI-powered stablecoin risk intelligence network. Continuously analyzes
 reserves, issuer health, peg stability, market sentiment, and
