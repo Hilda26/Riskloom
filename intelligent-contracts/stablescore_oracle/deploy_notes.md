@@ -238,3 +238,37 @@ followed by reading `get_score`/`get_history` back to confirm the
 write actually landed - confirming `status: "confirmed"` from the
 Edge Function alone was not sufficient evidence in either prior
 attempt.
+
+## RESOLVED - live deployment (2026-06-24)
+
+The bug #3 fix was redeployed to a fresh address and the full
+integration is now live and verified end-to-end:
+
+**Live contract address: `0x0Bd0EaE250a2829A9682f01ba36eb60BDd5311f3`**
+(StudioNet, RPC `https://studio.genlayer.com/api`)
+
+Verified directly against the live chain via the `genlayer-js` SDK
+(`scripts/verify_genlayer.ts`):
+- `list_stablecoins()` returns all 10 symbols.
+- `get_score()` for every symbol returns a real on-chain rating with a
+  populated `updated_at` timestamp (e.g. USDC -> AAA, USDT -> AA,
+  MIM -> CCC), proving `publish-to-genlayer`'s `update_score` writes
+  passed validator consensus and actually landed on-chain (the
+  exact failure mode of bugs #1-#3). This is the genuine
+  non-deterministic step: the deterministic composite/grade plus the
+  `gl.eq_principle.prompt_non_comparative` red-flag check ran across
+  all 5 validator LLMs without `NO_MAJORITY`.
+
+Frontend wiring confirmed live:
+- The deployed Vercel build (`web` project, alias `riskloom.vercel.app`)
+  has `NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS` inlined as the address
+  above and `NEXT_PUBLIC_GENLAYER_STUDIONET_RPC_URL` as the Studio
+  endpoint - read straight from the served JS chunk.
+- `apps/web/lib/genlayer/client.ts` uses the `genlayer-js` SDK
+  `readContract` path (not the old hand-rolled JSON-RPC).
+- GenLayer's RPC returns
+  `Access-Control-Allow-Origin: https://riskloom.vercel.app` on
+  preflight, so the browser oracle panel's on-chain read is not
+  blocked by CORS.
+
+Step 7 / Step 10 GenLayer integration: COMPLETE.
