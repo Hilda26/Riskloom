@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getStablecoinsWithLiveData } from "@/lib/stablecoins";
 import { Ticker } from "@/components/layout/Ticker";
 import { RatingBand } from "@/components/dashboard/RatingBand";
 import { KpiRow } from "@/components/dashboard/KpiRow";
@@ -12,15 +12,6 @@ import type { StableScoreGrade } from "@stableshield/shared-types";
 
 export const revalidate = 60;
 
-async function getStablecoins(): Promise<StablecoinWithScore[]> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("stablecoins")
-    .select("*, risk_scores(*)")
-    .order("symbol");
-  return (data ?? []) as unknown as StablecoinWithScore[];
-}
-
 function countByGrade(items: StablecoinWithScore[]): Record<StableScoreGrade, number> {
   const counts: Record<StableScoreGrade, number> = {
     AAA: 0, AA: 0, A: 0, BBB: 0, BB: 0, B: 0, CCC: 0, D: 0,
@@ -32,7 +23,7 @@ function countByGrade(items: StablecoinWithScore[]): Record<StableScoreGrade, nu
 }
 
 export default async function LandingPage() {
-  const stablecoins = await getStablecoins();
+  const stablecoins = await getStablecoinsWithLiveData();
   const counts = countByGrade(stablecoins);
   const previewItems = stablecoins.slice(0, 4);
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getOnChainScore, isOracleConfigured, type GenLayerScoreResult } from "@/lib/genlayer/client";
+import type { GenLayerScoreResult } from "@/lib/genlayer/client";
 
 const FALLBACK_SNIPPET = `<span class="cm"># Riskloom StableScore Oracle</span>
 <span class="cm"># Network: StudioNet - GEN token</span>
@@ -23,19 +23,38 @@ const FALLBACK_SNIPPET = `<span class="cm"># Riskloom StableScore Oracle</span>
 
 export function LiveContractPanel({ symbol = "USDC" }: { symbol?: string }) {
   const [result, setResult] = useState<GenLayerScoreResult | null>(null);
-  const [configured, setConfigured] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setConfigured(isOracleConfigured());
-    getOnChainScore(symbol).then(setResult).catch(() => setResult(null));
+    let active = true;
+    setLoading(true);
+    // Reads on-chain via our own server route (Node runtime), so this
+    // never depends on the GenLayer SDK in the browser.
+    fetch(`/api/oracle/${encodeURIComponent(symbol)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (active) setResult(data?.score ?? null);
+      })
+      .catch(() => {
+        if (active) setResult(null);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [symbol]);
 
   return (
     <div className="oracle-right">
-      <div className="oracle-lbl">GenLayer Contract - Live Call</div>
-      {configured && result ? (
+      <div className="oracle-lbl">
+        GenLayer Contract - Live Call
+        {loading && <span style={{ marginLeft: ".5rem", opacity: 0.6 }}>reading on-chain...</span>}
+      </div>
+      {result ? (
         <div className="code-block">
-          {`# Live read from StableScoreOracle\nget_score("${result.symbol}") -> {\n  rating: "${result.rating}",\n  score: ${result.score},\n  peg: ${result.peg},\n  reserve_ratio: ${result.reserve_ratio},\n  updated_at: "${result.updated_at}"\n}`}
+          {`# Live read from StableScoreOracle (StudioNet)\nget_score("${result.symbol}") -> {\n  rating: "${result.rating}",\n  score: ${result.score},\n  peg: ${result.peg},\n  reserve_ratio: ${result.reserve_ratio},\n  updated_at: "${result.updated_at}"\n}`}
         </div>
       ) : (
         <div className="code-block" dangerouslySetInnerHTML={{ __html: FALLBACK_SNIPPET }} />

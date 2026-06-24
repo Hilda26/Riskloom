@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { RatingPill } from "@/components/ui/RatingPill";
 import { LiveContractPanel } from "@/components/oracle/LiveContractPanel";
 import { formatPegPrice, formatMarketCap } from "@/lib/format";
+import { fetchLiveMarketData } from "@/lib/marketdata";
 
 export const revalidate = 0;
 
@@ -21,6 +22,14 @@ export default async function StablecoinDetailPage({
     .maybeSingle();
 
   if (!coin) notFound();
+
+  // Overlay live peg price / market cap from CoinGecko over the seed values.
+  const live = await fetchLiveMarketData();
+  const liveEntry = live[coin.symbol];
+  if (liveEntry) {
+    coin.peg_price = liveEntry.peg_price;
+    coin.market_cap_usd = liveEntry.market_cap_usd ?? coin.market_cap_usd;
+  }
 
   const { data: history } = await supabase
     .from("risk_score_history")

@@ -17,6 +17,8 @@ export default async function SettingsPage() {
     profile = data;
   }
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://<project>.supabase.co";
+
   return (
     <>
       <div className="dm-h">
@@ -32,11 +34,24 @@ export default async function SettingsPage() {
         </div>
         <div className="ktrend">Tier: {profile?.tier ?? "free"}</div>
       </div>
-      <p style={{ color: "var(--text2)", marginTop: "1.5rem", maxWidth: "540px" }}>
-        API key issuance for the Risk Intelligence API (exchanges, fintechs,
-        institutions) is managed server-side via the api_keys table. Self-serve
-        key generation UI ships alongside the billing/business-model work.
+
+      <div className="oracle-lbl" style={{ marginTop: "2rem" }}>Risk Intelligence API</div>
+      <p style={{ color: "var(--text2)", marginTop: ".5rem", maxWidth: "560px" }}>
+        Live, API-key-gated REST endpoints for exchanges, fintechs, wallets, and
+        institutions to consume StableScore&trade; ratings directly. Keys are
+        provisioned against the <code>api_keys</code> table with scoped access
+        (<code>read:scores</code>, <code>read:history</code>); pass yours in the
+        <code> x-api-key</code> header.
       </p>
+      <div className="code-block" style={{ marginTop: "1rem", maxWidth: "640px" }}>
+        {`# Current StableScore ratings (all coins, or ?symbol=USDC)
+curl -H "x-api-key: <YOUR_KEY>" \\
+  ${supabaseUrl}/functions/v1/api-v1-scores
+
+# Rating history for one stablecoin
+curl -H "x-api-key: <YOUR_KEY>" \\
+  ${supabaseUrl}/functions/v1/api-v1-history?symbol=USDC`}
+      </div>
     </>
   );
 }
