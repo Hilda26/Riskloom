@@ -223,28 +223,45 @@ const NAV_SECTIONS: { label: string; items: { href: string; label: string; icon:
 
 export function Sidebar() {
   const pathname = usePathname();
+  const allItems = NAV_SECTIONS.flatMap((section) => section.items);
 
   return (
-    <div className="dsb">
-      <div className="dsb-logo">
-        <LoomMark size={16} />
-        Riskloom
-      </div>
-      {NAV_SECTIONS.map((section) => (
-        <div key={section.label}>
-          <div className="dsb-s">{section.label}</div>
-          {section.items.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`dsb-i ${pathname === item.href ? "act" : ""}`}
-            >
-              {item.icon} {item.label}
-            </Link>
-          ))}
+    <>
+      <div className="dsb">
+        <div className="dsb-logo">
+          <LoomMark size={16} />
+          Riskloom
         </div>
-      ))}
-    </div>
+        {NAV_SECTIONS.map((section) => (
+          <div key={section.label}>
+            <div className="dsb-s">{section.label}</div>
+            {section.items.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`dsb-i ${pathname === item.href ? "act" : ""}`}
+              >
+                {item.icon} {item.label}
+              </Link>
+            ))}
+          </div>
+        ))}
+      </div>
+      {/* Below the dashboard's mobile breakpoint, .dsb is hidden entirely -
+          this flat horizontal bar keeps every tab reachable instead of
+          leaving narrow viewports with no dashboard navigation at all. */}
+      <nav className="dsb-mobile">
+        {allItems.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={`dsb-i ${pathname === item.href ? "act" : ""}`}
+          >
+            {item.icon} {item.label}
+          </Link>
+        ))}
+      </nav>
+    </>
   );
 }
 """,

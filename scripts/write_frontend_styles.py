@@ -272,8 +272,12 @@ footer p{font-family:var(--mono);font-size:.75rem;color:var(--text3);letter-spac
 /* wallet connect button slot (RainbowKit renders inside) */
 .wallet-slot{display:inline-flex;align-items:center;}
 
+/* mobile dashboard nav (shown instead of .dsb below the 1000px breakpoint
+   so dashboard pages always have a way to navigate between tabs) */
+.dsb-mobile{display:none;}
+
 /* responsive */
-@media(max-width:1000px){.dash-grid{grid-template-columns:1fr;}.dsb{display:none;}.krow{grid-template-columns:repeat(2,1fr);}.oracle-grid{grid-template-columns:1fr;}.oracle-left{border-right:none;border-bottom:1px solid rgba(99,102,241,.12);}}
+@media(max-width:1000px){.dash-grid{grid-template-columns:1fr;}.dsb{display:none;}.dsb-mobile{display:flex;gap:.4rem;overflow-x:auto;padding:.75rem 1rem;background:rgba(6,8,16,.9);border-bottom:1px solid rgba(245,158,11,.08);}.dsb-mobile .dsb-i{flex-shrink:0;margin-bottom:0;white-space:nowrap;}.krow{grid-template-columns:repeat(2,1fr);}.oracle-grid{grid-template-columns:1fr;}.oracle-left{border-right:none;border-bottom:1px solid rgba(99,102,241,.12);}}
 @media(max-width:820px){.ratings-row{grid-template-columns:repeat(4,1fr);}.mods{grid-template-columns:1fr;}.tbl-head{display:none;}.tbl-row{grid-template-columns:1fr 1fr;gap:.5rem;}}
 @media(max-width:680px){nav{padding:.9rem 1.25rem;}.nav-links{display:none;}.hero{padding:4.5rem 1.25rem 3rem;}.sec{padding:5rem 1.25rem;}.krow{grid-template-columns:1fr;}.fcta{margin:4rem auto 3rem;padding:3.5rem 1.5rem;}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important;}.reveal{opacity:1;transform:none;}}
