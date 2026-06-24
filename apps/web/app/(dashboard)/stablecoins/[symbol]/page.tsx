@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { RatingPill } from "@/components/ui/RatingPill";
 import { LiveContractPanel } from "@/components/oracle/LiveContractPanel";
+import { PublishOnChainButton } from "@/components/oracle/PublishOnChainButton";
 import { formatPegPrice, formatMarketCap } from "@/lib/format";
 import { fetchLiveMarketData } from "@/lib/marketdata";
 
@@ -72,6 +73,7 @@ export default async function StablecoinDetailPage({
         <div className="oracle-grid" style={{ gridTemplateColumns: "1fr" }}>
           <LiveContractPanel symbol={coin.symbol} />
         </div>
+        <PublishOnChainButton symbol={coin.symbol} />
       </div>
     </>
   );
